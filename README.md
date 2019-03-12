@@ -1,7 +1,7 @@
 # MUGS - Model of Urban Green Spaces. 
 
-Modelling the emergence of inter-city differences in the usage of green spaces.
-The model is spatially explicit, it simulates Scottish cities in their 16+ population, urban form and distribution of socio economic condition.
+An agent-based model of the emergence of inter-city differences in the usage of green spaces.
+The model is spatially explicit, it simulates Scottish cities in their 16+ population, urban form and distribution of green spaces and socio economic condition.
 
 # Drivers of the dynamics
 ## Pull factors
