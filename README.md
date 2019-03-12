@@ -13,10 +13,10 @@ The model is spatially explicit, it simulates Scottish cities in their 16+ popul
 
 Observation of other’s behaviour. Diffrent possible implementations:
 
-* “normative behaviors are influenced by relative shifts in observed behaviours”
-** observe differences in the number of park-goers in local area from day to day (or week to week). Increase will encourage people to go, decrease will do nothing (or discourage).
+* _normative behaviors are influenced by relative shifts in observed behaviours_
+  * observe differences in the number of park-goers in local area from day to day (or week to week). Increase will encourage people to go, decrease will do nothing (or discourage).
 * compare local behaviour against global (city)
-** confront own area with rest of city, more park goers encourage people to go, less do nothing. (computationally less demanding, but less realistic)
+* confront own area with rest of city, more park goers encourage people to go, less do nothing. (computationally less demanding, but less realistic)
 * Observe global city wide behaviour.
 
 ## Push factors
