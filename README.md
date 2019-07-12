@@ -19,6 +19,11 @@ Observation of other’s behaviour. Diffrent possible implementations:
 * confront own area with rest of city, more park goers encourage people to go, less do nothing. (computationally less demanding, but less realistic)
 * Observe global city wide behaviour.
 
+### Walkability
+
+A walkability measure is introduced. Agents in highly walkable areas will be more likely to visit green spaces, likewise those in less walkable place will tend to visit less.
+
+
 ## Push factors
 ### Dissonance (experience)
 
@@ -42,5 +47,3 @@ If too many (randomly selected) people in the park the same day are too differen
   * Under 16/ Over 64 missing - will include.
 * Agents randomly choose one among list of nearby parks.
   * Bigger parks have a larger catchment area
-* Introduce differences in scope by SEC?
-  * “Rich people will go further”?
