@@ -1,0 +1,569 @@
+---
+title: "A humble hypothesis on the origin of social and spatial inequalities in green space usage"
+author: "SPHSU - Places Programme"
+date: "25/09/2019"
+output:
+  html_document: 
+    css: mugs.css
+    fig_caption: yes
+    toc: yes
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## The problem of people's contact with nature
+
+It is one of the most well known facts in Public Health that spending time in natural environments (parks, forests, the seaside and the likes) bears a positive association with a variety of measures of physical and mental well being. A recent [scientific report in the Nature journal](https://www.nature.com/articles/s41598-019-44097-3) even quantified the amount of time in contact with nature associated with positive health outcomes: 120 minutes per week.
+
+An equally well known fact is that engagement with nature is socially patterned, and that often those who are least likely to engage with green and blue space are also those who would benefit the most from it. [Boyd et al.](https://www.sciencedirect.com/science/article/pii/S0169204618300914?via%3Dihub), for instance, showed that in England people of lower "socio economic status" (expressed by the ubiquitous two-letter, four-level code by which the UK Census classifies the population according to their occupation: AB, C1, C2, DE) are more likely to visit green spaces "infrequently" and "very infrequently". Also, several studies indicate that proximity to green spaces is not necessarily a predictor of their usage, nor is the variably assessed "quality" of them. Scotland seems to fit in the pattern. We analysed data from the [Scotland's People and Nature survey](https://www.nature.scot/snh-commissioned-report-679-scotlands-people-and-nature-survey-201314) looking into how frequently people living in Scottish cities (n=1,550) visit their public parks. What we saw at a first glance is, on one side, consistent with what we know from other studies: having a dog, having a child and owning one's home increase the likelihood of visiting green spaces more frequently, being old and in the lower strata of the "socio economic classification" is associated with less frequent visits to parkland.
+
+```{r echo=FALSE}
+spans<-read.csv("../agents_new.csv",sep=";")
+reg<-lm(formula = spans$freq.to.park ~ spans$age + spans$ses + 
+          spans$has.dog + spans$gender + spans$has.child + spans$has.car + 
+          spans$location + spans$tenure + spans$ethni)
+summary(reg)
+```
+
+The regression summarised above tells us two more things. One is that only 20% of the variance in the data is explained by the model, indicating that something other than class, dogs and children must be very relevant for the phenomenon. The other is that, along with social class, age, children and dogs, *living in Edinburgh* is associated with a higher number of visits to parks.
+
+This is evident when plotting an estimation of the (median) actual number of visits to urban green spaces by class by city.
+
+```{r echo=FALSE, fig.width = 6, fig.height = 4}
+library(reshape2)
+library(ggplot2)
+agents<-read.csv("../agents_new.csv",sep=";")
+agents<-agents[,c(5,9,17)]
+colnames(agents)<-c("ses","city","visits")
+mlt<-melt(agents,id=c("city","ses"))
+cst<-dcast(mlt,city~ses,median,fill=NaN)
+mlt2<-melt(cst,id="city")
+cst$ineq<-round(cst$AB/cst$DE,2)
+ineq<-cst[,c(1,6)]
+ggplot(data=mlt2,aes(x=city, y=value, fill=variable)) +
+  geom_bar(stat="identity", position = position_dodge()) + 
+  scale_x_discrete(labels=c(paste0(ineq[,1]," (",ineq[,2],")"))) +
+  labs(fill="SES",y="Median visits to UGS per year",x="City (AB/DE)")
+```
+
+While the social gradient is evident in all cities - people in the "AB" social group visit green spaces more than others everywhere, and people in "DE" visit the least - people in Edinburgh (with the exception of those in the "C2" SES category) visit green spaces at least twice as much as people in the corresponding socio-economic group in any other city in Scotland. Moreover, Edinburgh displays the lowest inequality in the frequency of green space usage between the top and bottom SES categories: those in the "AB" class visit parks a little more than twice as many times than those in "DE", compared with almost 12 times in Aberdeen and almost 5 in Glasgow.
+
+## Where does the "Edinburgh effect" come from?
+
+The peculiarity of the Edinburgh pattern - twice as frequent usage of urban green spaces, both overall and when broken down by social status, paired with low inequality between classes - is an interesting one, especially for those seeking to increase engagement with nature among the more "disadvantaged". The patterning in Edinburgh, in fact, seems to hint at the existence of a cross-class **culture** of engaging with green space, a culture which does not exist, or exists to a lesser extent elsewhere.
+
+Before we take to possible explanations for the phenomenon, there is one big caveat: this is *one* survey, conducted at one point in time, relying on self reported behaviour of the respondents. A comparison for robustness with a more recent wave of the same survey was impossible, since the question regarding urban green spaces hasn't been asked in the more recent run of the survey.
+
+That said, if we accept that the _Edinburgh effect_ is indeed real, we might start looking for an explanation of it somewhere away from the variables we regressed upon.
+
+Our hypothesis is that structural factors might play a role in the emergence of the Edinburgh effect. Things like the different social composition of Edinburgh compared to the other three cities, the different *urban forms* of Scottish cities, and the particular distribution of green spaces within them. 
+
+The differences in social composition are indeed substantial, strikingly apparent just glancing at a plot of the Scottish index of multiple deprivation across Glasgow and Edinburgh, for instance.
+
+```{r echo=FALSE, out.width = "400px"}
+knitr::include_graphics("../gla-gis.jpg")
+```
+
+```{r echo=FALSE, out.width = "400px"}
+knitr::include_graphics("../edin-gis.jpg")
+```
+
+Breaking down the population by SEC confirms the suspect. Edinburgh is a much wealthier city than the others: 67% of its population sits in the top two social categories, followed by Aberdeen.
+
+```{r echo=FALSE}
+socialg<-read.csv("../../census/socialclass_scotland.csv")
+
+socAB<-aggregate(socialg$AB,by=list(socialg$LAName),FUN=sum)
+socC1<-aggregate(socialg$C1,by=list(socialg$LAName),FUN=sum)
+socC2<-aggregate(socialg$C2,by=list(socialg$LAName),FUN=sum)
+socDE<-aggregate(socialg$DE,by=list(socialg$LAName),FUN=sum)
+
+soc<-merge(socAB,socC1,by="Group.1")
+colnames(soc)<-c("Group.1","AB","C1")
+soc<-merge(soc,socC2,by="Group.1")
+soc<-merge(soc,socDE,by="Group.1")
+
+colnames(soc)<-c("LAName","AB","C1","C2","DE")
+
+soc$ABp<-round(soc$AB/rowSums(soc[2:5]),digits = 2)
+soc$C1p<-round(soc$C1/rowSums(soc[2:5]),digits=2)
+soc$C2p<-round(soc$C2/rowSums(soc[2:5]),digits=2)
+soc$DEp<-round(soc$DE/rowSums(soc[2:5]),digits=2)
+
+soc<-soc[c(1,5,8,15),c(1,6:9)]
+colnames(soc)<-c("LocalAuthority","AB","C1","C2","DE")
+
+knitr::kable(soc, caption='Proportion of population by SEC')
+```
+
+Can these differences play a role in the emergence of a culture of visiting, or not visiting, green spaces?
+
+The suggestion that the social composition of a city, and the spatial arrangement of social groups, might play a bigger role than usually acknowledged in the issue of engagement with green space came from a few mostly qualitative works in the literature. In particular, [this study](https://linkinghub.elsevier.com/retrieve/pii/S1353829206000256) and the associated [report](https://www.gcph.co.uk/assets/0000/0531/Its_More_Than_Just_the_Park_-_full_report.pdf) seem to suggest that an important factor in people's decision of whether to visit a particular park or not is **who else is there**. In the paper in question age and class differences seem to be the most important factors, with some of the interviewees mentioning the presence of groups of "unsupervised older children", "drug users", and "*neds*" (a derogatory Scottish term referring to someone of a low social standing) as the cause of them avoiding the local green space. The implications of these findings are worth exploring further since, if the intuition of Seaman and colleagues has substance, the patterning we observe in green space usage may be, at least partially, a(nother) product of the fractures that exist in society and of their manifestation in space: in other words, it may be a classic geo-social problem.
+
+After all, who we encounter when we visit a green space (or any other amenity) in a city depends on a number of socio-spatial factors, primarily who the amenity is accessible to - which, in turn, depends ultimately on where the amenity is located and who is around it - and who is willing and capable to visit it. In turn, the way the presence of other people affects our experience is influenced by a large and nuanced set of psychological, social, and environmental factors, not least, as the paper suggests, the state of *social integration* in society at large. 
+
+The suggestion that we wish to explore is that, because people react to the presence of others in a green space, implicitly holding a preference for the company of certain people more than others, each Scottish city's particular socio-spatial make up - its social composition and residential distribution, together with the particular placement of green spaces and the peculiar co-presence of ages and classes that such placement affords - could be the driving force behind the observed intra and inter-urban differences in green space usage.
+
+How can we put this, let's call it _social integration hypothesis_, to the test? One way of testing the plausibility of this quasi-theory is to implement its premises in an agent based model and see whether the patterns that we see in the survey responses - in particular the class gradient in green space usage, and the Edinburgh effect - can emerge from the type of interaction between people of different social grades that reproduces the findings in the literature.
+
+## The model
+
+### Society *in* space
+
+We built a simple agent-based model in the glorious tradition of *threshold models*, popularised by Thomas Schelling with his study of the socio-spatial problem par excellence, **ethnic segregation**. Building on the findings of Seaman and colleagues our assumption is that the decision of whether to visit a green space for a second time is influenced primarily by the agent's assessment of who else was within the green space when she visited a previous time, and that such assessment runs primarily along class lines.
+
+Now, how to implement this simple assumption is a problem in itself. While there's enough evidence that those in the top socioeconomic strata prefer being surrounded by agents of similar social standing, not much research is available into the preferences of those in lower social strata. For this reason we decided to model the top two classes as _homophiliac_, and test various levels of _homophily_ and _heterophily_ for those in the bottom two groups.
+
+We constructed four stylized models of the four Scottish cities, including their geography, location and size of public green spaces, and their 16+ population in scale - all agents endowed with age, gender and socio-economic status, derived from the 2011 Census. 
+
+In example, here is how Aberdeen is represented in the model. The dots representing residents, coloured according to their SEC group: yellow, red, blue and black representing respectively AB, C1, C2, and DE. The initial representation of the cities has been built in GIS embedding the geography of the cities, the location of green spaces and the distribution of the population.
+
+```{r echo=FALSE, out.width = "400px"}
+knitr::include_graphics("../aberdeen-view.png")
+```
+
+The most relevant variables associated to agents in the model are summarised below:
+
+| variable | description | type | range | source | held by |
+|---|--------|---|-----|-----|-----------|
+| c | socio-economic status | string | [AB,C1,C2,DE] | Census | all agents |
+| y | age | int | 16 - 100 | Census | all agents |
+| g | accessible green spaces | list | {...} | GIS |  all agents |
+| p | probability of visiting an UGS | real | 0 - 1 | hypothesis | all agents |
+| t | homophily threshold | real | 0 - 1 | hypothesis | upper two classes in heterophily condition, all agents in homophily condition |
+| ht | heterophily threshold | real | 0 - 1 | hypothesis | lower two classes in heterophily condition |
+| v | number of visits | int | 0 - \infty | model output | all agents | 
+
+### The morphology of the city 
+
+Class relations are one component of the proposed model. Our socio-spatial approach to reconstructing green space usage has another important theoretical forerunner, coming from the planning literature: the *morphological determinism* of none less than Jane Jacobs. In her seminal work, [The death and life of great American cities](https://en.wikipedia.org/wiki/The_Death_and_Life_of_Great_American_Cities), Jacobs argues that the relationship of people with the space they inhabit depends primarily by certain _physical_ (morphological and architectural) features of the space itself. At the core of the principled rejection of her day's urban renewal planning practices, stood the persuasion that dense, small-scale, mixed use urban areas afford walking, the development of a _street life_, social contact. And, we shall add, engagement with green space, if available.
+
+We implement this principle adding a _walkability_ score to every location in the four cities, the score representing the components that Jane Jacobs and the array of scholars that followed in her footsteps consider crucial for a neighbourhood to be amenable for walking ans street life. Dwelling density, number of street intersections and land use diversity compose the [Macdonald index of walkability](http://eprints.gla.ac.uk/109442/). Conveniently expressed in quartiles, the index is calculated by LSOA. We embed it in the baseline GIS model upon which the agent-based model is constructed, and assume that "walkability" is a neighbourhood-level feature impacting all the residents in an equal manner. We express it as a constant, _w_, which augments or reduces an agent's probability of visiting a green space, assuming, with Jane Jacobs, that residents of neighbourhoods which possess that _je ne sais quoi_, will be more likely to go for a walk and, if possible, wouldn't disdain a stroll in the park.
+
+Finally, to test the impact of social distinction and walkability _coeteris paribus_, we assumed no differences between urban green spaces other than size. We reasoned that an agent would travel more to visit a bigger park, and therefore each green space has a "catchment" proportional to its size, as displayed in the figure below, and agents may have more than one park within their reach.
+
+```{r echo=FALSE, out.width = "400px"}
+knitr::include_graphics("../catchment.gif")
+```
+
+Our aim, with this study, is to test whether the differentiation between people and cities can emerge solely as a consequence of the dynamics we posit, therefore we initialize the model assuming that all agents start with the exact same probability of visiting a green space. The only exception being those living very far away from parks, for whom this initial probability is halved, in line with findings from several studies suggesting that, while proximity is not particularly relevant in people's decision to visit a green space, when the distance exceeds a walk of around 20/25 minutes people are much less likely to visit.
+
+During each simulated day an agent visits the first green space in his list of accessible spaces _g_ with probability _p * w_. Those who have visited a park then evaluate other park goers. Here the _dissonance thresholds_ come into play. In the "**homophily**" condition we assume that all agents have a preference for agents similar to themselves: they will check if the proportion of those met in the park belonging to a different social class exceeds _t_. If it does, the probability of visiting a green space the subsequent day is reduced of a factor _a_, so that p~t+1~ = p~t~ - (a * p~t~). In such case, if the agent has more than one park within her reach, she will also move the "offending" park to the back of the list, so that the subsequent time she will try a different one.
+Symmetrically, if the number of "different" people in the park is small enough, the agent will increase her probability of going again, and to the same park: p~t+1~ = p~t~ + (a * p~t~).
+
+In the "**heterophily**" condition, we assume that agents of the lower social classes behave the opposite way: they prefer to encounter at least a proportion _ht_ of agents of the upper classes. The process is displayed below:
+
+```{r echo=FALSE, out.width = "600px"}
+knitr::include_graphics("../flowchart.png")
+```
+
+Another assumption of the model is the existence of a localised "cultural exchange" dynamic. If those living around an agent visit parks substantially more or substantially less than the agent, he will increase or reduce his probability of visiting of factor _a_, to become more similar to the neighbours. This mechanism tries to capture a _neighbourhood effect_, whereby people living in the same area are assumed to interact and influence each other's behaviour. It has always been a core tenet of geography that "things" close in space are more related than things that are distant. Paraphrasing, we assume that people close to each other are more likely to influence each other, and become more similar, as Robert Axelrod posited in a famous model of cultural diffusion. 
+
+## Results
+
+The model outlined above offers a stylised representation of some of the dynamics that we believe could affect the emergence of persistent spatial and social differentiation in green space utilisation: neighbourhood walkability, different levels of _inter-class tolerance_, and localised social influence: all factors often overlooked in most of the research into green spaces. The crucial parameters that drive the model are the homophily and heterophily thresholds, _t_ and _ht_, as the variations in the likelihood of agents visiting green spaces are determined by these thresholds being exceeded. The other modifications of one's probability of visiting a green space are either determined by a constant, such as walkability, or endogenous to the model, such as the influence of neighbours.
+
+We tested all possible values of _t_ and _ht_, and all the possible combinations of the two. We found that, in the homophily condition in which all agents seek the company of agents of similar social status, and all that is varied is the tolerable proportion of dissimilar agents, _t_[^1], the patterns emerging do not bear any resemblance with the patterns observed in the survey. This is because, as we will show, Scottish cities are fairly segregated, and green spaces are more or less evenly distributed within each city, so that agents of any socioeconomic group are often able to meet enough similar agents to be satisfied, except in the case of extreme levels of intolerance.
+
+In the heterophily condition, on the contrary, we see patterns emerging that closely resemble the observed situation. When we assume that people in the lower two social groups prefer to visit parks frequented by at least a few of those in the upper two groups, the Edinburgh effect is, in fact, **always** emerging. A social patterning, whereby those in the upper classes visit consistently more than others, also emerges in the model under all combinations of the two parameters, and at the same time Edinburgh consistently displays both the highest number of visits overall, and the lowest inequality between agents in the top and bottom social groups. Also, Aberdeen and Glasgow tend to exhibit the highest levels of inequality, as shown in the diagrams below that display the final state of a subset of model runs. 
+
+````{r echo=FALSE, fig.height = 10}
+library(gridExtra)
+library(stringr)
+
+version<-"0.4.3"
+scale<-20
+
+dta<-read.csv(paste0("spans-",version,"-scale_",scale,"-all.csv"))
+
+dta<-dta[order(dta$city),]
+dta$abdeRtAvg<-round(dta$meanAB/dta$meanDE,1)
+dta$abdeRtMed<-round(dta$medAB/dta$medDE,1)
+dta$city<-str_sub(dta$city,1,3)
+
+val<-c(unique(dta$a))
+valB<-c(unique(dta$b))
+tol<-c(unique(dta$tolerance))
+htol<-c(unique(dta$heteroph.tol))
+init<-c(unique(dta$initial.prob))
+equal<-c(levels(dta$equalinit))
+random<-c(levels(dta$random))
+walk<-c(levels(dta$walkability))
+segregated<-c(levels(dta$segregated))
+heter<-c(levels(dta$heterophily))
+pull<-c(levels(dta$pull))
+
+relevant<-c(1,15:18) # median - comment these two lines
+mn<-"med"            # to plot median values
+
+#relevant<-c(1,19:22) # mean - uncomment these two lines 
+#mn<-"mean"           # to plot mean values
+
+i<-0
+
+for(j in equal) {
+  for(w in walk) {
+    for(r in random){
+      for (v in val){
+        for(bb in valB) {
+          for (t in tol) {
+            for (ht in htol){
+              for (h in heter) {
+                for (p in pull) {
+                  for (s in segregated){
+                    ee<-""   # "Edinburgh effect"
+                    dist<-"actual"
+                    pll<-""
+                    if(r=="true"){dist<-"random"}else{if(s=="true"){dist<-"segregated"}}
+                    if(h=="true"){phily<-"heterophily"}else{phily<-"homophily"}
+                    if(w=="true"){wlk<-"walk"}else{wlk<-"no_walk"}
+                    if(p=="true"){pll<-"pull"}
+                    dat<-dta[dta$equalinit==j & dta$random==r & dta$walkability == w & 
+                                dta$a==v & dta$b==bb & dta$tolerance==t & dta$heteroph.tol==ht & 
+                                dta$heterophily==h & dta$segregated==s & dta$pull==p,]
+                      
+                    ineq<-cbind(dat[c(1,ncol(dta))],rowSums(dat[15:18])/4)
+                    colnames(ineq)<-c("city","ineq","total")
+   
+                    ttl<-paste0("v",version,"; s=",scale, "; ", phily, "; ", pll, "; ", wlk,"; dist: ", dist, " ", ee)
+                    st<-(paste0("t=",t, "; ht=", ht))
+                  
+                    ## Produce the dataset for diagrams 
+                    dat<-dat[relevant]
+                    colnames(dat)<-sub(mn,"",colnames(dat))
+                    dat<-melt(dat,id="city")
+                    colnames(dat)<-c("city","class","visits")
+                    
+                    ## Save the diagram
+                    
+                    assign(paste0("p",i),ggplot(data=dat,aes(x=city, y=visits, fill=class)) +
+                             geom_bar(stat="identity", position = position_dodge()) + 
+                             ggtitle(st) +
+                             scale_x_discrete(labels=c(paste0(ineq[,1]," (",ineq[,2],")")))
+                           + labs(fill="SES",y="med. visits to UGS/year",x="city (ab/de)")
+                           )
+                    i<-i+1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+grid.arrange(p10,p11,p12,p13,p14,p15,p16,p17,ncol = 2)
+
+````
+
+```{r echo=FALSE, fig.height = 7, fig.width = 7, fig.cap="Progression of the average number of visits to green spaces per SEC across the four cities in the course of one simulation run (four years = 1460 days)"}
+
+version<-"0.4.3"
+cities<-c("edinburgh","glasgow","aberdeen","dundee")
+scale<-30
+fact<-0.25
+tol<-0.55
+htol<-0.3
+
+equal<-c("-equalinit")
+phily<-c("heteroph")
+par(mfrow=c(2,2))
+#layout(matrix(c(1,2,3,4), 2, 2, byrow = TRUE),widths = c(1,1))
+
+for(ct in cities){
+  for(s in scale){
+    for(a in fact){
+      for(t in tol){
+        for(eq in equal){
+          for(p in phily){
+            for(ht in htol){
+              #print(c(ct,s,a,t,eq,p))
+              dta<-read.csv(paste0("individual_runs/",version,"/spans-",version,"-class-pull-",p,eq,"-",ct,
+                                   "-p0.09-a",a,"-b0.8-t",t,"-h",ht,"-wlk-s",s,".csv"))
+              dta<-dta[,-ncol(dta)]
+              #for(i in c("median","mean")){
+              for(i in c("mean")){
+                if(i=="median"){v=2}else{v=6}
+                plot(dta[,1],dta[,v], type="l", lty=1,lwd=1, col = "red", xlab='days', ylab=paste0(i, " visits per week"), ylim = c(0,5), xlim = c(0,1460), main = ct#, sub = paste0("s = ",s,"; a = ",a,"; t = ",t,"; th = ",ht,"; ",eq,"; ",p)
+                )
+                lines(dta[,1],dta[,v+1], lty=1,lwd=1, col="darkgreen") 
+                lines(dta[,1],dta[,v+2], lty=1,lwd=1, col="lightblue")
+                lines(dta[,1],dta[,v+3], lty=1,lwd=1, col="purple") 
+                legend("topleft",legend=c("ab","c1","c2","de"), col=c("red","darkgreen","lightblue","purple"), lwd = 1)
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### How socioeconomic inequality and the 'Edinburgh effect' emerge in the model 
+
+The same behaviour implemented for all agents, and the same initial parameters, give rise to consistently different outcomes in the four cities: the differences lie in the cities' social composition, the spatial distribution of the population within them, and the characteristics of the built environment in which the population is embedded. The factors that drive the dynamic unfolding in the model, for the most part, are: (1) the number of agents of the higher social grades, and (2) their level of spatial segregation. Broadly, when in a city there are many, more sparsely distributed, agents of grade AB and C1 they are more likely to encounter similar agents in a public green space, therefore they will be satisfied often with the social composition of the park (i.e their tolerance threshold _t_ will be exceeded on rare occasions), and their probability of visiting again will go up. At the same time, agents of the lower social grades will encounter agents of higher standing often enough for their willingness to visit to also increase,  thanks to the latter's abundance and _availability_ across the city. Such dynamic is then further amplified by the _social influence_ effect, whereby agents are influenced by their neighbours. This is the situation of Edinburgh, a city with a high proportion of agents of the AB and C1 SECs and a lower level of segregation. Glasgow, on the contrary, has less agents in the top two socioeconomic categories, and they are more segregated. The result is that many of them, thanks to the high segregation, do manage to encounter similar agents frequently, but agents of the lower two classes only very seldom come across enough agents of higher social standing in the green spaces accessible to them, therefore they will tend to visit green spaces less and less: a situation in which inequality increases and the overall number of visits to UGSs stays relatively low. The social influence aspect further contributes to the inequality, as the lower SEC agents, segregated away from the richer, are influenced by the surrounding agents who are also penalised by the same mechanism: the result is that the collective willing of visiting green spaces in poorer areas spirals downwards.
+
+The [Morrill index of segregation](http://raphael.geography.ad.bgu.ac.il/ojs/index.php/GRF/article/view/91) (an index of dissimilarity derived from the Duncan & Duncan dissimilarity measure that takes into consideration the adjacency between spatial units) confirms that Edinburgh is the city with the lowest level of segregation
+
+```{r echo=FALSE, message=FALSE}
+socialgr<-read.csv("~/census_tables/sco/pcode/socialgrade_scotland.csv")
+cities<-c("edinburgh","glasgow","aberdeen","dundee")
+library(rgdal)
+library(spatialEco)
+library(OasisR)
+
+for (c in cities) {assign(c,readOGR(paste0("../modeldata/pcode-pop-",c,".shp"), verbose = FALSE))}
+
+comment(dundee)<-"dundee"
+comment(aberdeen)<-"aberdeen"
+comment(edinburgh)<-"edinburgh"
+comment(glasgow)<-"glasgow"
+
+cities<-c(edinburgh,glasgow,aberdeen,dundee)
+
+for (c in cities) {assign(comment(c),merge(c,socialgr,by.x="code",by.y="zone"))}
+
+edi<-edinburgh@data[7:10]
+gla<-glasgow@data[95:98]
+abe<-aberdeen@data[7:10]
+dun<-dundee@data[8:11]
+
+segr<-ISMorrill(gla,spatobj = glasgow)
+segr<-rbind(segr,ISMorrill(edi,spatobj = edinburgh))
+segr<-rbind(segr,ISMorrill(abe,spatobj = aberdeen))
+segr<-rbind(segr,ISMorrill(dun,spatobj = dundee))
+segr<-cbind(c("glasgow","edinburgh","aberdeen","dundee"),segr)
+
+colnames(segr)<-c("city","ab","c1","c2","de")
+
+knitr::kable(segr, caption='Morril Index of segregation')
+
+```
+
+Examining the interaction between the two variables _t_ and _ht_ clarifies the dynamics of the model. The four plots below show the median number of visits to UGSs (first two plots) and the inequality between the top and bottom socioeconomic groups (bottom two plots), after four simulated years, under different combinations of _t_ and _ht_. The first plot of the two sets shows values for levels of _t_ when _ht_ varies and the second shows values for levels of _ht_ when _t_ varies. An increase in _t_ - the tolerance of higher status agents towards those of lower status - results in an increase of visits in all cities: the reason being that a higher tolerance threshold means that high status agents will accept the presence of a higher number of low status agents, resulting in them visiting green spaces more. Consequently, lower status agents will encounter more higher status agents within the green spaces, especially in the least segregated cities, resulting in their _ht_ threshold being exceeded more frequently, and will visit more often themselves. The effect will then reverberate on the neighbours, thanks to the "neighbourhood effect". The dynamic of inequality varies by city, though. An increase of _t_, for every level of _ht_ (last plot) produces an increase in inequality in all cities, bar Edinburgh. This is clearly the consequence of segregation: when _t_ increases, wealthier agents visit UGSs more, however, if most agents of lower status live elsewhere they don't benefit from this increase in visits.
+
+```{r echo=FALSE, fig.height = 3}
+version<-"0.4.3"
+scale<-20
+dta<-read.csv(paste0("spans-",version,"-scale_",scale,"-all.csv"))
+dta<-dta[dta$b==0.8 & dta$tol!=0.25,][-12]
+dat<-dta[c(1,4,11:17)]
+dat$avg<-rowSums(dat[6:9])/4
+dat$ineq<-dat$medAB/dat$medDE
+pull<-dat[dat$pull=="true",-2]
+dat025<-pull[pull$a==0.25,]
+ggplot(data=dat025,aes(x=factor(heteroph.tol), y=avg, group=city, shape=city,color=city)) + geom_line() + 
+  geom_point() +
+  labs(x="ht",y="median visits") +
+  facet_grid(.~tolerance )
+
+ggplot(data=dat025,aes(x=factor(tolerance), y=avg, group=city, shape=city,color=city)) + geom_line() + 
+  geom_point() +
+  labs(x="t",y="median visits") +
+  facet_grid(.~heteroph.tol )
+
+ggplot(data=dat025,aes(x=factor(heteroph.tol), y=ineq, group=city, shape=city,color=city)) +
+  geom_line() + 
+  geom_point() +
+  labs(x="ht",y="inequality (ab/de)") +
+  facet_grid(.~tolerance)
+
+ggplot(data=dat025,aes(x=factor(tolerance), y=ineq, group=city, shape=city,color=city)) +
+  geom_line() + 
+  geom_point() +
+  labs(x="t",y="inequality (ab/de)") +
+  facet_grid(.~heteroph.tol)
+
+```
+
+One noteworthy observation highlighted in the diagrams above is that increasing the level of _ht_ bears an _increase_ in the overall number of visits to UGSs (first plot). This is peculiar since an increase in _ht_ implies that _fewer_ agents of low SEC will visit UGSs, as they will be seeking a higher proportion of agents of higher status, thus reducing their likelihood to visit. This is true of every city, for every level of _t_, and is due to the fact that, with fewer agents of lower SEC around, the agents of higher SEC are more willing to visit green spaces, as their tolerance threshold is exceeded more rarely. In other words, a _decrease_ in the number of low status agents in UGSs produces an _increase_ in agents of higher status, who drive the overall increase in visits shown in the first plot. And in fact, an increase in inequality is shown (third plot) in all cities, except, again, Edinburgh, where the impact of an increase in _ht_ on inequality is non existent, since wealthier agents find enough similar agents anyway, regardless of what happens in the proportion of others within parks.
+
+This phenomenon has interesting implications, as it suggests that increasing the willingness to visit UGSs on the part of agents of lower status might bear the unintended consequence of producing a retreat on the part of those of higher status. It is as situation closely reminding of many a failed attempt at mixing tenures in certain urban neighbourhoods. In absence of either a robust number of people of the same status, or an increase in the willingness to _mix_ with people of lower status (i.e in increase of _t_) such experiments are inevitably destined to fail (at least in the little virtual world that we conceived).
+
+## What this model is for and what it tells us
+
+This work occupies a somewhat centre ground in the continuum between purely abstract and completely descriptive and data-driven models: we designed a realistic population, accurate with regards to age, gender and socio economic classification - based on official "hard" data from the Census; we embedded it in a feature-rich space - obtained from equally detailed GIS data; but endowed it with a behaviour that is extremely stylised - loosely based on suggestions derived from a diverse literature. The model, therefore, takes the form of an elaborate "thought experiment" performed _in silico_ to overcome the limitations of the human brain (specifically those of the author's brain), a privilege afforded by the computational instrument employed, the agent-based model. With this tool we were able to isolate the effect of essentially one principle of behaviour, combined with certain features of the space the agents are embedded into, and were able to highlight an entirely non-obvious fact of some interest: that the moment we assume that wealthier people are more likely to visit a green space if there are fewer poorer people around, and poorer people do the opposite, two distinct phenomena observed in reality emerge very consistently: socio-economic disparity in the frequency of visits to UGS, and what we have described as the "Edinburgh effect". In other words, the two extremely simple rules of behaviour, when played out within the context of Scottish cities, are sufficient to consistently produce a set of complex observed outcomes currently devoid of a good explanation. In addition to that, the levels of inequality across the four Scottish cities produced by the model are qualitatively similar to those observed in reality: low in Edinburgh and Dundee, higher in Glasgow and Aberdeen. The simulation also tells us very clearly that, under its behavioural rules, the environmental factors that determine the phenomena are primarily the proportion of wealthy people in a city and their spatial segregation from the rest of the population. 
+
+What do we make of all this? In other words..
+
+### Is the model _right_?
+
+Like all models, this model is wrong. But, as George Box wrote in 1976, it could be of some use. The model is wrong because it clearly doesn't reproduce the phenomenon to the letter. It's not a 1:1 representation of reality, for it would be impossible and useless to build a world-sized model, and in this case, given the degree of abstractness, is not even a 1:10000 representation. How much does the model resemble the real world? The task of validating a model, or assessing the extent to which the simulated dynamics relate to the real dynamics, is an enormous one, has produced a vast literature and a number of different approaches. 
+
+One approach, favoured by models with the ambition of _predicting_ the possible evolution of a system, involves _calibrating_ the trajectory of the dynamic reproduced in the model onto the historic evolution of the modelled system in reality. Once the correct parameters are derived so that the model reproduces the past, the synthetic future generated by the model is assumed to be more plausible. It is an approach not devoid of risks, as the fact that a certain historic trajectory is reproduced is no guarantee that the process that reproduces it in the model bears any relationship with those that generated it in reality. It is the problem of **equifinality**, that plagues every modelling exercise: the fact that a number of extremely different mechanisms could, in principle, produce the same result. A claim that accompanies such models is generally that of employing "the best available knowledge" to inform the agents' behaviour, as deriving the behaviour from a robust set of evidence is thought to mitigate the risks 
+
+Our model, at least in its current stage, falls in the category of **explanatory models**. We propose a candidate set of individual-level behaviours capable of generating certain aspects of an observed system-level phenomenon, in our case the social gradient in visits to UGSs and the Edinburgh effect. And we evaluate whether the behaviour implemented in the model might have some relationship with the real behaviours that produce the phenomenon in reality. 
+An established line of thought, _the impressionists_ we'll call them, argues that, to be useful, an explanatory model should be able to reproduce a phenomenon or a pattern in its _salient_ qualitative characteristics. Generate the shape of a certain observed distribution, for instance. It is a useful but problematic stance: how much similarity with the real phenomenon is enough to consider the model "valid"? The model presented here clearly reproduces certain aspects of the observed reality, but not others. The socioeconomic gradient in UGS visits emerges in the model, the "Edinburgh effect" is also there, but the observed differences between cities are not matched in the simulation. In particular, visits to UGSs in Dundee are very underestimated in the model, compared to reality, due to the relative scarcity of wealthy agents. Aberdeen, on the contrary, is overestimated, thanks to its high number of wealthy agents. Clearly some mechanism other than those implemented produces the high frequency of visits observed in Dundee and the low one in Aberdeen. 
+
+This takes us to what _is not_ in the model. Notably, considerations on the quality of the different UGSs, a factor that arguably most people would probably consider when deciding whether to use or not use an UGS, are not implemented here. This is partly due to the absence of reliable objective data sources covering all parks of Scottish cities, partly because "quality", as a subjective construct, may not be assessed unequivocally and does not have the same meaning for every sector of society. However, that of the equality of UGSs, bar size, is a strong assumption, especially since evidence exists that green spaces in poorer areas could enjoy poorer maintenance compared to those in more affluent areas, see for example [this paper](https://linkinghub.elsevier.com/retrieve/pii/S1353829206000256). 
+
+One going approach in evaluating the meaning of our findigs is that we should use the model to give us a _broad_ sense of something that _may_ be going on, in some form, in the real world. Or affecting other mechanisms and behaviour taking place in the world outside the computer. Provide insight into the phenomenon, offer a different, less explored angle. What this model tells us is that the simple rule of behaviour that we postulate, loosely drawing on diverse evidence, is **sufficient** to generate the phenomenon at hand. This holds if we have a somewhat _restrictive_ definition of "the phenomenon". If we circumscribe it to the socioeconomic gradient + Edinburgh effect, that is. If we were to consider "the phenomenon" to also include, say, the exact sorting of cities with regards to average visits to green spaces, then the hypothesis tested would stop being sufficient for the phenomenon to emerge.
+
+However, in the context of a Public Health outlook on the topic, in spite of its somewhat diminutive underlying behavioural assumptions, this model does provide some insight into the issues suggests that at the basis of the currently observed inequalities in green space usage might be issues broader than currently acknowledged. Issues related to social integration, both in the sense of _spatial_ integration and perception and acceptance of others.
+
+## Appendix. The bizarre idea of "validating" a model with a model, and the curious case of a surprisingly good model-to-model "validation (or maybe not)"
+
+Among the possibilities afforded by agent-based models is that of generating data of various nature originating from different aspects and steps of the processes that the virtual population enacts. Our model of people going in and out of public parks, for instance, allows us to output data on which parks are visited the most, or where the agents that visit parks the most reside in the four cities. Such data could then be used to provide another form of validation for the model, were empirical data available offering the actual values in the real world. Unfortunately, in our case, no such data are available. We have, however, the survey whence our initial research question originates: SPANS. Several hundreds of respondents provide data on how often they visit UGSs, but these data are a-spatial. All we know is the Local Authority of residents of the respondents, from which we constructed the first diagram. However a method to generate spatial microdata, comparable with those outputted by the agent-based model, from this type of representative survey exists: spatial microsimulation. 
+
+Spatial microsimulation generates spatial microdata — individuals allocated to zones — by combining individual and geographically aggregated datasets. SPANS, in our case, supplies the individual dataset while the Census constitutes the ideal aggregated dataset. In this interpretation, ‘spatial microsimulation’ is roughly synonymous with ‘population synthesis’: the whole population of one city will be generated by replicating the characteristics of SPANS respondents according to their representativeness of Census Data zones in terms of 4 constraining variables: age, gender, ethnicity and SEC. The most widely used and mature deterministic method to allocate individuals to zones is iterative proportional fitting (IPF). IPF was demonstrated by Deming and Stephan (1940) for estimating internal cells based on known marginals.
+
+```{r echo=FALSE, out.width = "400px"}
+knitr::include_graphics("../unnamed-chunk-2-1.png")
+```
+
+The only city for which the survey is representative enough to be able to produce the whole population using IPF is Glasgow. Once the population of the city has been produced, we can plot the spatial distribution of a certain attribute of the synthetic residents - frequency of visits to UGSs, in this case - and compare it with the same attribute generated in the ABM. 
+
+The following maps show such comparison, plotting median visits to UGSs in the microsimulation (first map) and agent-based models. The diagrams at the bottom plot the Pearson's correlation between the number of visits by each postcode area in the microsimulation and ABM in two of the parameter combinations that produce the best correspondence. 
+
+```{r echo=FALSE, message=FALSE, out.width="600px"}
+library(RColorBrewer)
+library(gridExtra)
+
+my.colours <- brewer.pal(6, "Blues")
+glasgow_bench<-readOGR("../../census/glasgow_microsim_pcode.shp", verbose = FALSE)
+
+version<-"0.4.3"
+scale<-10
+
+dta<-read.csv(paste0("spans-",version,"-scale_",scale,"-all.csv"))
+zones<-read.csv(paste0("spans-",version,"-scale_",scale,"-zones.csv"), row.names = NULL, stringsAsFactors=FALSE)
+colnames(zones)<-colnames(zones)[-1]
+zones<-zones[-ncol(zones)]
+
+dta<-dta[order(dta$city),]
+dta$abdeRtAvg<-round(dta$meanAB/dta$meanDE,1)
+dta$abdeRtMed<-round(dta$medAB/dta$medDE,1)
+
+tol<-0.25
+htol<-0.25
+
+relevant<-c(1,15:18) # median - comment these two lines
+mn<-"med"            # if you want to plot median values
+
+#relevant<-c(1,19:22) # mean - uncomment these two lines 
+#mn<-"mean"           # if you want to plot mean values
+
+dat<-dta[dta$equalinit=="true" & dta$random=="false" & dta$walkability == "true" & 
+        dta$a==0.25 & dta$b==0.8 & dta$tolerance==tol & dta$heteroph.tol==htol & dta$heterophily=="true" & dta$segregated=="false" & dta$pull=="true",]
+                    
+diff0<-NA
+diff1<-NA
+corr<-NA
+                    
+ineq<-cbind(dat[c(1,ncol(dta))],rowSums(dat[15:18])/4)
+colnames(ineq)<-c("city","ineq","total")
+                    
+## We now compare the Glasgow distribution with the Microsimulation
+glaval<-zones[zones$city=="glasgow" & zones$equalinit=="true" & zones$random=="false" & zones$walkability == "true" & zones$a==0.25 & zones$b==0.8 & zones$tolerance==tol & zones$heteroph.tol==htol & zones$heterophily=="true" & zones$segregated=="false" & zones$pull=="true",]
+glaval<-glaval[c(1,ncol(glaval)-1)]
+qtl<-quantile(glaval$median)
+msm_qtl<-quantile(glasgow_bench$msim_bench)
+glaval$abm.qtl<-0
+glasgow_bench$msm_qtl<-0
+                    
+for(qq in rev(1:5)){
+  glaval$abm.qtl<-ifelse(glaval$median<=qtl[qq],qq,glaval$abm.qtl)
+  glasgow_bench$msm.qtl<-ifelse(glasgow_bench$msim_bench<=msm_qtl[qq],qq,glasgow_bench$msm.qtl)
+}
+                                       
+colnames(glaval)<-c("code","abm.med","abm.qtl")
+bench<-merge(glasgow_bench@data,glaval,by="code")
+bench$diff<-abs(bench$msm.qtl-bench$abm.qtl)
+good<-nrow(bench[bench$diff==0,])
+diff0<-round(good/nrow(bench), digits=2)
+diff1<-round(((good + nrow(bench[bench$diff==1,]))/nrow(bench)), digits = 2)
+corr<-round(cor(bench$msim_bench,bench$abm.med),digits = 2)
+                    
+valid_geo<-merge(glasgow_bench,glaval,by="code")
+                    
+## Save the map
+spplot(valid_geo, "msim_qtl", col.regions=my.colours, cuts=5, scales = list(draw=T))
+spplot(valid_geo, "abm.qtl", col.regions=my.colours, cuts=5, scales = list(draw=T))
+
+plot(bench$msim_bench,bench$abm.med, xlab="spatial microsimulation median", ylab="ABM median", 
+     main=paste0("t=", tol, "; ht=", htol, "; r=", corr))
+
+# abline(lm(valid_geo$abm.med ~ valid_geo$msim_bench))
+
+```
+
+```{r echo=FALSE, message=FALSE, out.width="600px"}
+my.colours <- brewer.pal(6, "Blues")
+glasgow_bench<-readOGR("../../census/glasgow_microsim_pcode.shp", verbose = FALSE)
+
+version<-"0.4.3"
+scale<-10
+
+dta<-read.csv(paste0("spans-",version,"-scale_",scale,"-all.csv"))
+zones<-read.csv(paste0("spans-",version,"-scale_",scale,"-zones.csv"), row.names = NULL, stringsAsFactors=FALSE)
+colnames(zones)<-colnames(zones)[-1]
+zones<-zones[-ncol(zones)]
+
+dta<-dta[order(dta$city),]
+dta$abdeRtAvg<-round(dta$meanAB/dta$meanDE,1)
+dta$abdeRtMed<-round(dta$medAB/dta$medDE,1)
+
+tol<-0.55
+htol<-0.45
+
+relevant<-c(1,15:18) # median - comment these two lines
+mn<-"med"            # if you want to plot median values
+
+#relevant<-c(1,19:22) # mean - uncomment these two lines 
+#mn<-"mean"           # if you want to plot mean values
+
+dat<-dta[dta$equalinit=="true" & dta$random=="false" & dta$walkability == "true" & 
+        dta$a==0.25 & dta$b==0.8 & dta$tolerance==tol & dta$heteroph.tol==htol & dta$heterophily=="true" & dta$segregated=="false" & dta$pull=="true",]
+                    
+diff0<-NA
+diff1<-NA
+corr<-NA
+                    
+ineq<-cbind(dat[c(1,ncol(dta))],rowSums(dat[15:18])/4)
+colnames(ineq)<-c("city","ineq","total")
+                    
+## We now compare the Glasgow distribution with the Microsimulation
+glaval<-zones[zones$city=="glasgow" & zones$equalinit=="true" & zones$random=="false" & zones$walkability == "true" & zones$a==0.25 & zones$b==0.8 & zones$tolerance==tol & zones$heteroph.tol==htol & zones$heterophily=="true" & zones$segregated=="false" & zones$pull=="true",]
+glaval<-glaval[c(1,ncol(glaval)-1)]
+qtl<-quantile(glaval$median)
+msm_qtl<-quantile(glasgow_bench$msim_bench)
+glaval$abm.qtl<-0
+glasgow_bench$msm_qtl<-0
+                    
+for(qq in rev(1:5)){
+  glaval$abm.qtl<-ifelse(glaval$median<=qtl[qq],qq,glaval$abm.qtl)
+  glasgow_bench$msm.qtl<-ifelse(glasgow_bench$msim_bench<=msm_qtl[qq],qq,glasgow_bench$msm.qtl)
+}
+                                       
+colnames(glaval)<-c("code","abm.med","abm.qtl")
+bench<-merge(glasgow_bench@data,glaval,by="code")
+bench$diff<-abs(bench$msm.qtl-bench$abm.qtl)
+good<-nrow(bench[bench$diff==0,])
+diff0<-round(good/nrow(bench), digits=2)
+diff1<-round(((good + nrow(bench[bench$diff==1,]))/nrow(bench)), digits = 2)
+corr<-round(cor(bench$msim_bench,bench$abm.med),digits = 2)
+                    
+valid_geo<-merge(glasgow_bench,glaval,by="code")
+                    
+## Produce the map
+spplot(valid_geo, "abm.qtl", col.regions=my.colours, cuts=5, scales = list(draw=T))
+
+plot(bench$msim_bench,bench$abm.med, xlab="spatial microsimulation median", ylab="ABM median", 
+     main=paste0("t=", tol, "; ht=", htol, "; r=", corr))
+```
+
+We built two models of completely different nature, based on different assumptions, although not completely disjoint - class has a role in both, albeit in very different forms - and obtain very similar results. How to interpret this? The spatial microsimulation technique is designed to generate plausible small area level data distributions, based on official demographic data and representative survey data, under the assumption that the variables for which the small area distribution is generated are correlated with the set of demographic constraining variables employed in the modelling exercise.
+
+_Prima facie_, our more than decent comparison between the outcomes of two models so different in nature, seems to offer an excellent example of "**between-model comparisons**" - comparing the results of different models - which according to the prevailing norm in the [Public Health literature](https://bmcpublichealth.biomedcentral.com/articles/10.1186/1471-2458-10-710) is considered important evidence of validity, provided that the models are developed independently.
+
+However, one problematic fact hampers the validating power of the spatial microsimulation model: the rationale underlying the initial agent-based model rested upon the realization that demographic variables were **not** so strongly correlated to the frequency of visits outcome, the very fact that confers validity to the spatial microsimulation model. Or at least that they would not cover the whole phenomenon. The decision to develop an agent-based model was taken, as pointed out in the first paragraph, exactly because of that.
+
+This leaves us with the puzzling question of why are the two models producing such similar results, excluding pure chance. What does such similarity tell us of the relationship between the two models, and of both models with reality?
+
+[^1]: We also tested different tolerance thresholds for different classes
