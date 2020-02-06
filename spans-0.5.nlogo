@@ -224,7 +224,6 @@ ask patches gis:intersecting greenery [
     ;; we now repurpose parkT as a table keeping track of what kind of people
     ;; visited each park through the simulation.
     ;; park-name | ab | c1 | c2 | de
-
     table:put parkT pk [0 0 0 0]
   ]
 end
@@ -392,43 +391,38 @@ to-report iAmDissonant [otherpeople pkq]
   let others n-of (1 + (count otherpeople / fc)) otherpeople
 
   ;; We check the quality of the park ahead of everything, assuming that to be the primary concern of people.
-  if have-quality [
-    ifelse pkq = 0
-    [if random 100 < 80 [report true]]              ; If the park is bad (almost) everyone will hate it
-    [if pkq < 4 [if random 100 < 33 [report true]]] ; If the park is less than perfect some people will hate it
-  ]
+  if have-quality and pkq = 0 [if random 100 < 80 [report true]]   ; If the park is bad (almost) everyone will hate it
 
-  if push-age [
-    if age >= 65 [if count others with [age <= 30] / count others > 0.7 [report true]]
-  ]
+  ; [if pkq < 4 [if random 100 < 33 [report true]]]]; If the park is less than perfect some people will hate it
 
-  ;; In this implementation we assume that the top 2 classes (AB and C1) behave as in
-  ;; prior versions (are tolerant/intolerant towards people of the bottom two classes).
-  ;; On the contrary, people from the bottom 2 classes seek to frequent parks where they are more likely
-  ;; to encounter people from the top 2 classes. In other words, the top 2 classes crave class segregation,
-  ;; the bottom 2 seek class diversity.
+  if push-age [if age >= 65 [if count others with [age <= 30] / count others > 0.7 [report true]]]
+
+  ;; In this implementation we assume that the top 2 classes (AB and C1)
+  ;; are tolerant/intolerant towards people of the bottom two classes.
+  ;; People from the bottom 2 classes seek to frequent parks where they are more likely
+  ;; to encounter people from the top 2 classes.
+  ;; In other words, the top 2 classes crave class segregation, the bottom 2 seek class diversity.
 
   ifelse class > 2 [
     ; the poor
+    if have-quality and pkq < 4 [if random 100 < 35 [report true]]
     if push-cl [
       let differing count others with [class < 3] / count others
       ifelse Heter
       [if differing < tol [report true]] ;; this guy fancies being around the rich and is dissonant if there are too few.
       [if differing > tol [report true]] ;; this guy wants to be around similar people
     ]
-    if have-quality and pkq < 4 [if random 100 < 35 [report true]]
     ][; the rich
+    if have-quality and pkq < 4 [if random 100 < 65 [report true]]
     if push-cl [
       let differing count others with [class > 2] / count others
       if differing > tol [report true]   ;; the rich always want to be among themselves.
     ]
-    if have-quality and pkq < 4 [if random 100 < 65 [report true]]
   ]
   report false
 end
 
 ;; ==========================|| "social influence" ||====================================
-
 
 to getLocalInfluence
   ;; This checks a random neighbour. If they have gone more than us, we will be encouraged.
