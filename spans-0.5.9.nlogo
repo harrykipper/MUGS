@@ -4,7 +4,7 @@ globals [
   version patch-dimension
   world place greenery walk ; GIS datasets
   zones visits-t parks parkT
-  class-t dogs-t ind-file file-string area-file ppl-file picture
+  class-t dogs-t file-string area-file ppl-file picture
   classes quintiles prob-init
   factor ; proportion of people agents compare themselves to in the park.
   diversity ; Shannon idx
@@ -14,10 +14,9 @@ globals [
   dog-owners
   non-dog-owners
   parks-t
-  conditions
-  header-1
-  header-1A
-  header-ind
+
+  ;; Outputting
+  conditions header-1 header-2 header-1A header-ind basename file-name zone-file parks-file ind-file base
 ]
 
 patches-own [simd name parkid parksize parkquality green? smallpark? centre attractivity walkability park-factor]
@@ -32,7 +31,6 @@ turtles-own [
 
 to make-dogs-table
   ; Lookup table to assign the proportion of dog-owners for each class in each city (from SPANS)
-  ; source of this is 'agents.csv'. The question is whether the last trip to nature included a dog.
   set dogs-t table:from-list
   (list
     (list "glasgow" (list 0.19 0.24 0.25 0.22))
@@ -47,10 +45,6 @@ to setup
   file-close-all
   reset-ticks
 
-  set header-1 "run,city,age,class,pull,random,segregated,heterophily,equalinit,initial-prob,walkability,a,b,tolerance,heteroph-tol,quality,dogs"
-  set header-1A ",medAB,medC1,medC2,medDE,meanAB,meanC1,meanC2,meanDE,"
-  set header-ind "sumAB,sumC1,sumC2,sumDE,"
-
   ; This is the west end of Glasgow.
   set wst ["S28000345" "S28000350" "S28000340" "S28000343" "S28000339" "S28000341"
     "S28000371" "S28000369" "S28000370" "S28000342" "S28000344"]
@@ -58,7 +52,7 @@ to setup
   ; certain combinations of cases don't make sense or produce trivial results
   ; if impossible-run [stop]
 
-  set version "0.5.9"
+  set version "0.5.9_final"
   set classes [1 2 3 4]
   set quintiles [1 2 3 4 5]
 
@@ -109,7 +103,12 @@ to setup
   set dog-owners turtles with [has-dog = true]
   set non-dog-owners turtles with [has-dog = false]
 
-  if behaviorspace-run-number > 0 [prepare-data-save]  ;; If we are in batch mode we produce an output file with everything in it.
+  ;; If we are in batch mode we produce an output file with everything in it.
+  if behaviorspace-run-number > 0 [
+    setup-output
+    prepare-data-save
+  ]
+
   colour-world
   ;vid:start-recorder
 end
@@ -238,7 +237,7 @@ ask patches gis:intersecting greenery [
       let these table:get parks-t pk ; with [parkid = pk]
 
       ; We define "small" a park of size below the median size of all parks in the city
-      let small? table:get parkT pk <= medsize
+      let small? table:get parkT pk < medsize
 
       if small? [ask these [set smallpark? true]]
       let quality 4
@@ -261,7 +260,7 @@ ask patches with [walkability > 0][
       walkability = 1 [0.5]
       walkability = 2 [0.66]
       walkability = 3 [1]          ;; The walkability idx looks trustworthy only for the top quartile.
-                      [2])
+                      [2])         ;; We conservatively assume that only the top quartile will encourage
     if have-walkability = false [set walkability 1]
   ]
 end
@@ -310,7 +309,7 @@ to set-preferred-parks
   ]
 ;  show (word "DEBUG: " city ": " (count turtles with [length myLocalParks = 0] / count turtles) " agents with no parks!!")
   ask turtles [
-    ;; If the agent doesn't have any park in their immediate reach the probability is minimized
+    ;; If the agent doesn't have any park in their immediate reach the probability is reduced
     set myLocalParks remove-duplicates myLocalParks
     if length myLocalParks = 0 [set prob-going prob-going * 0.65]
     set closest-park [parkid] of min-one-of parks [distance myself]
@@ -390,7 +389,7 @@ to evaluate-agents-experience
   ;; All those who have gone to a park check whether they liked who else was there.
   ;; If an agent is dissonant, her likelihood to visit a park will decrease of factor 'a'
   ;; and will move the offending park to the bottom of the list of accessible parks,
-  ;; so that next time he'll go to a different place.
+  ;; so that next time she'll go to a different place.
   ;; If the mix was acceptable the likelihood of going again, and to the same park, goes up
 
   ;update-park-attendance pk people-here
@@ -427,7 +426,7 @@ to-report iAmDissonant [otherpeople pkq]
   ;; We check the quality of the park ahead of everything, assuming that to be the primary concern of people.
   if have-quality and pkq = 0 [if random 100 < 80 [report true]]   ; If the park is bad (almost) everyone will hate it
 
-  if age > 65 and push-age [if count others with [age <= 30] / count others > 0.7 [report true]]
+  if age > 65 and push-age [if count others with [age <= 30] / count others >= 0.7 [report true]]
 
   ;; In this implementation we assume that the top 2 classes (AB and C1)
   ;; are tolerant/intolerant towards people of the bottom two classes.
@@ -545,8 +544,6 @@ to-report get-parkquality [dep]
 end
 
 to-report get-attractivity [pksize]
-  ;; People will walk 200 meters to get to a park of 1,000sqm
-  ;; and 2km to get to a park larger than 20,000sqm
   report (ifelse-value
     pksize < (200 ^ 2) / (patch-dimension ^ 2) [200 / patch-dimension]
       pksize < (500 ^ 2) / (patch-dimension ^ 2) [500 / patch-dimension]
@@ -594,6 +591,25 @@ end
 
 ; ===================================| Data output |============================================
 
+to setup-output
+  let dir "results/"
+  set basename (word "spans-" version "-" behaviorspace-experiment-name "-scale_" scale)
+
+  set header-1 "run,city,age,class,pull,random,segregated,heterophily,equalinit,initial-prob,walkability,a,b,tolerance,heteroph-tol,quality,dogs"
+  set header-1A ",medAB,medC1,medC2,medDE,meanAB,meanC1,meanC2,meanDE,"
+  set header-ind "sumAB,sumC1,sumC2,sumDE,"
+  set header-2 "varAB,varC1,varC2,varDE,med1,med2,med3,med4,med5,mean1,mean2,mean3,mean4,mean5,mean,median"
+
+  set ppl-file (word dir "individual_runs/" basename "-ppl.csv")
+  set ind-file (word dir "individual_runs/" basename "-ind.csv")
+  set area-file (word dir "individual_runs/" basename "-area.csv")
+  set picture word base ".png"
+
+  set file-name (word dir basename "-all.csv")
+  set zone-file (word dir basename "-zones.csv")
+  set parks-file (word dir basename "-parks.csv")
+end
+
 to prepare-data-save
   set conditions (word behaviorspace-run-number "," city "," push-age "," push-cl "," pull "," random-allocation ","
     complete-segregation "," prop-heter-c2de "," same-init-prob "," initial-prob "," have-walkability ","
@@ -613,18 +629,9 @@ to prepare-data-save
   if same-init-prob [set equalinit "-equalinit"]
   if have-walkability [set walkab "-wlk"]
   set file-string (word version agepush classpush influence equalinit randomall perfectseg)
-  let base (word "results/individual_runs/spans-" file-string "-p" initial-prob "-a" a "-b" b "-t"
+  set base (word "results/individual_runs/spans-" file-string "-p" initial-prob "-a" a "-b" b "-t"
     tolerance "-h" heteroph-tol "-pH" prop-heter-c2de walkab "-s" scale
   )
-
-  let basename (word "results/individual_runs/spans-" version "-scale_" scale )
-
-  set ppl-file word basename "-ppl.csv"
-  set ind-file word basename "-ind.csv"
-  set area-file word basename "-area.csv"
-  set picture word base ".png"
-
-
 
   if not file-exists? ind-file [
     file-open ind-file
@@ -639,13 +646,6 @@ to prepare-data-save
 end
 
 to save-final-stats
-  ;; This file contains the final values of every simulation run of a specific city.
-  let dir "results/"
-  let file-name (word dir "spans-" version "-scale_" scale "-all.csv")
-  let zone-file (word dir "spans-" version "-scale_" scale "-zones.csv")
-  let parks-file (word dir "spans-" version "-scale_" scale "-parks.csv")
-  let header-2 "varAB,varC1,varC2,varDE,med1,med2,med3,med4,med5,mean1,mean2,mean3,mean4,mean5,mean,median"
-
   ifelse file-exists? file-name
   [file-open file-name]
   [
@@ -1440,73 +1440,6 @@ NetLogo 6.2.0
 @#$#@#$#@
 @#$#@#$#@
 <experiments>
-  <experiment name="majority" repetitions="10" sequentialRunOrder="false" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <exitCondition>ticks = 1 + (365 * years)</exitCondition>
-    <enumeratedValueSet variable="tolerance">
-      <value value="0.5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="heteroph-tol">
-      <value value="0.5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="prop-heter-c2de">
-      <value value="0.33"/>
-      <value value="0.5"/>
-      <value value="0.66"/>
-      <value value="1"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="initial-prob">
-      <value value="0.07"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="a">
-      <value value="0.25"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="b">
-      <value value="0.8"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="same-init-prob">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="city">
-      <value value="&quot;aberdeen&quot;"/>
-      <value value="&quot;edinburgh&quot;"/>
-      <value value="&quot;dundee&quot;"/>
-      <value value="&quot;glasgow&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="scale">
-      <value value="8"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="pull">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="push-cl">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="push-age">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="global-perception">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="random-allocation">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="complete-segregation">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="have-walkability">
-      <value value="true"/>
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="have-quality">
-      <value value="true"/>
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="have-dogs?">
-      <value value="false"/>
-    </enumeratedValueSet>
-  </experiment>
   <experiment name="master" repetitions="10" sequentialRunOrder="false" runMetricsEveryStep="false">
     <setup>setup</setup>
     <go>go</go>
@@ -1535,7 +1468,9 @@ NetLogo 6.2.0
       <value value="0.07"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="a">
+      <value value="0.1"/>
       <value value="0.25"/>
+      <value value="0.4"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="b">
       <value value="1"/>
@@ -1572,82 +1507,10 @@ NetLogo 6.2.0
     </enumeratedValueSet>
     <enumeratedValueSet variable="have-walkability">
       <value value="true"/>
+      <value value="false"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="have-quality">
       <value value="true"/>
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="have-dogs?">
-      <value value="true"/>
-    </enumeratedValueSet>
-  </experiment>
-  <experiment name="master-nullmodel" repetitions="10" sequentialRunOrder="false" runMetricsEveryStep="false">
-    <setup>setup</setup>
-    <go>go</go>
-    <exitCondition>ticks = 1 + (365 * years)</exitCondition>
-    <enumeratedValueSet variable="tolerance">
-      <value value="0.3"/>
-      <value value="0.4"/>
-      <value value="0.5"/>
-      <value value="0.6"/>
-      <value value="0.7"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="heteroph-tol">
-      <value value="0.3"/>
-      <value value="0.4"/>
-      <value value="0.5"/>
-      <value value="0.6"/>
-      <value value="0.7"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="prop-heter-c2de">
-      <value value="0.33"/>
-      <value value="0.5"/>
-      <value value="0.66"/>
-      <value value="1"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="initial-prob">
-      <value value="0.07"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="a">
-      <value value="0.25"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="b">
-      <value value="1"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="same-init-prob">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="city">
-      <value value="&quot;aberdeen&quot;"/>
-      <value value="&quot;edinburgh&quot;"/>
-      <value value="&quot;dundee&quot;"/>
-      <value value="&quot;glasgow&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="scale">
-      <value value="10"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="pull">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="push-cl">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="push-age">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="global-perception">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="random-allocation">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="complete-segregation">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="have-walkability">
-      <value value="true"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="have-quality">
       <value value="false"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="have-dogs?">
